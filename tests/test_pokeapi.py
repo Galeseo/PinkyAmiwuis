@@ -524,6 +524,26 @@ class TestWeb(unittest.TestCase):
         self.assertEqual(status, 200)
         self.assertIn("endpoints", payload)
 
+    def test_indice_expone_la_version(self):
+        import pokeapi
+
+        status, payload = self._get("/")
+        self.assertEqual(status, 200)
+        self.assertEqual(payload["version"], pokeapi.__version__)
+
+    def test_version_sincronizada_con_pyproject(self):
+        # Si se bombea una y no la otra, lo desplegado miente sobre su versión.
+        import pokeapi
+
+        root = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+        with open(os.path.join(root, "pyproject.toml"), encoding="utf-8") as handle:
+            declared = [
+                line.split("=")[1].strip().strip('"')
+                for line in handle
+                if line.startswith("version = ")
+            ]
+        self.assertEqual(declared, [pokeapi.__version__])
+
     def test_pokemon_exacto(self):
         status, payload = self._get("/pokemon/pikachu")
         self.assertEqual(status, 200)

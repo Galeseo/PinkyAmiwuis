@@ -14,6 +14,7 @@ import os
 import urllib.parse
 from typing import Any, Callable, Dict, Iterable, List, Optional, Tuple
 
+from . import __version__
 from .client import PokeApiClient
 from .errors import (
     HttpError,
@@ -99,6 +100,8 @@ def _evolution(node: EvolutionNode) -> Dict[str, Any]:
 def route_index() -> Dict[str, Any]:
     return {
         "service": "pokeapi-py",
+        # Sirve para comprobar de un vistazo qué versión hay desplegada.
+        "version": __version__,
         "description": "Proxy cacheado de la PokéAPI con búsqueda por nombre parcial.",
         "endpoints": {
             "GET /pokemon/{nombre|id}": "Ficha. Admite parciales: /pokemon/chari",

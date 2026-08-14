@@ -7,7 +7,7 @@ build-backend = "setuptools.build_meta"
 # herramientas que deducen la ruta a partir del nombre (Poetry, PDM) buscan
 # un 'pokeapi_py/' que no existe y fallan al instalar.
 name = "pokeapi"
-version = "1.0.0"
+version = "1.1.0"
 description = "Cliente y API web de la PokéAPI sin dependencias, con caché local y CLI."
 readme = "README.md"
 requires-python = ">=3.8"
