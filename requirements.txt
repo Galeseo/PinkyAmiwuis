@@ -1,0 +1,3 @@
+# El cliente y la app web no usan dependencias: solo librería estándar.
+# Gunicorn es únicamente el servidor WSGI de producción.
+gunicorn>=21.2,<24

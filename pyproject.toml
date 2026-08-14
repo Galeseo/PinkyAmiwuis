@@ -1,0 +1,24 @@
+[build-system]
+requires = ["setuptools>=61"]
+build-backend = "setuptools.build_meta"
+
+[project]
+# El nombre coincide a propósito con la carpeta del paquete: si no, las
+# herramientas que deducen la ruta a partir del nombre (Poetry, PDM) buscan
+# un 'pokeapi_py/' que no existe y fallan al instalar.
+name = "pokeapi"
+version = "1.0.0"
+description = "Cliente y API web de la PokéAPI sin dependencias, con caché local y CLI."
+readme = "README.md"
+requires-python = ">=3.8"
+dependencies = []
+
+[project.optional-dependencies]
+# Solo para servir la app WSGI en producción; el paquete en sí no lo necesita.
+web = ["gunicorn>=21.2,<24"]
+
+[project.scripts]
+pokeapi = "pokeapi.cli:main"
+
+[tool.setuptools]
+packages = ["pokeapi"]

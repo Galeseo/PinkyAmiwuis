@@ -1,0 +1,16 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(python3 -m pokeapi pokemon pikachu)",
+      "Bash(python3 -m pokeapi evolution eevee)",
+      "Bash(python3 -m pokeapi species pikachu)",
+      "Bash(python3 -m unittest discover -s tests)",
+      "Bash(python3 -m pokeapi --ttl 1 cache)",
+      "Bash(python3 -m pokeapi --json pokemon ditto)",
+      "Bash(python3 -m pokeapi)",
+      "Bash(echo \"exit=$?\")",
+      "Bash(python3 -m pokeapi --no-cache pokemon ditto)",
+      "Bash(python3 -m pokeapi list --endpoint type --limit 3)"
+    ]
+  }
+}

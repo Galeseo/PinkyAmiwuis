@@ -1,0 +1,18 @@
+# Blueprint de Render. Con este archivo en el repo, Render configura el
+# servicio solo: New > Blueprint en vez de rellenar el formulario a mano.
+services:
+  - type: web
+    name: pokeapi-py
+    runtime: python
+    plan: free
+    buildCommand: pip install -r requirements.txt
+    startCommand: gunicorn pokeapi.web:app --bind 0.0.0.0:$PORT --workers 2 --threads 4 --timeout 60
+    healthCheckPath: /health
+    envVars:
+      - key: PYTHON_VERSION
+        value: "3.11.9"
+      # El disco de Render es efímero y solo /tmp es escribible con garantías.
+      # La caché sobrevive mientras la instancia siga viva, que es lo que
+      # importa para no machacar la PokéAPI.
+      - key: POKEAPI_CACHE_DIR
+        value: /tmp/pokeapi-cache
