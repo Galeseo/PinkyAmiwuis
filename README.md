@@ -232,7 +232,7 @@ Si prefieres hacerlo a mano (**New → Web Service**):
 | --- | --- |
 | Runtime | Python 3 |
 | Build command | `pip install -r requirements.txt` |
-| Start command | `gunicorn pokeapi.web:app --bind 0.0.0.0:$PORT` |
+| Start command | `python -m gunicorn pokeapi.web:app --bind 0.0.0.0:$PORT` |
 | Health check path | `/health` |
 
 Variables de entorno recomendadas: `PYTHON_VERSION=3.11.9` y
@@ -241,6 +241,21 @@ es el sitio escribible, y la caché sobrevive mientras la instancia siga viva).
 
 En el plan gratuito la instancia se duerme tras 15 minutos sin tráfico, así que
 la primera petición después de dormir tarda bastante.
+
+**Por qué `python -m gunicorn` y no `gunicorn` a secas**: si el build instala en
+un virtualenv que no queda en el PATH, el arranque muere con
+`Exited with status 127` (command not found). Invocarlo como módulo usa el
+mismo intérprete que hizo el `pip install`, así que siempre lo encuentra.
+
+Si aun así falla, la app arranca **sin gunicorn**, solo con la librería
+estándar, cambiando el start command por:
+
+```bash
+python -m pokeapi.web
+```
+
+Respeta la variable `PORT` y es multihilo, así que aguanta peticiones
+concurrentes sin problema.
 
 ## Tests
 

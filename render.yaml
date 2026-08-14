@@ -6,7 +6,11 @@ services:
     runtime: python
     plan: free
     buildCommand: pip install -r requirements.txt
-    startCommand: gunicorn pokeapi.web:app --bind 0.0.0.0:$PORT --workers 2 --threads 4 --timeout 60
+    # 'python -m gunicorn' en vez de 'gunicorn' a secas: si el script de
+    # consola no queda en el PATH (pasa cuando el build instala en un
+    # virtualenv distinto), el arranque muere con "command not found" (127).
+    # Invocarlo como módulo usa el mismo intérprete que hizo el pip install.
+    startCommand: python -m gunicorn pokeapi.web:app --bind 0.0.0.0:$PORT --workers 2 --threads 4 --timeout 60
     healthCheckPath: /health
     envVars:
       - key: PYTHON_VERSION

@@ -335,12 +335,21 @@ def _respond(
 
 
 def serve(host: str = "0.0.0.0", port: Optional[int] = None) -> None:
-    """Servidor de desarrollo con la librería estándar."""
-    from wsgiref.simple_server import make_server
+    """Servidor con la librería estándar, sin necesidad de gunicorn.
+
+    Multihilo, así que una petición lenta a la PokéAPI no bloquea al resto.
+    Sirve para desarrollo y como plan B en producción si gunicorn no está
+    disponible: ``python -m pokeapi.web`` respeta la variable PORT.
+    """
+    from socketserver import ThreadingMixIn
+    from wsgiref.simple_server import WSGIServer, make_server
+
+    class ThreadingWSGIServer(ThreadingMixIn, WSGIServer):
+        daemon_threads = True
 
     port = port or int(os.environ.get("PORT", 8000))
     print("Escuchando en http://{0}:{1}".format(host, port))
-    make_server(host, port, app).serve_forever()
+    make_server(host, port, app, server_class=ThreadingWSGIServer).serve_forever()
 
 
 if __name__ == "__main__":
