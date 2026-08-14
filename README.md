@@ -1,6 +1,8 @@
 # PinkyAmiwuis
 WiuWiuWiu
 
+[![CI](https://github.com/Galeseo/PinkyAmiwuis/actions/workflows/ci.yml/badge.svg)](https://github.com/Galeseo/PinkyAmiwuis/actions/workflows/ci.yml)
+
 Cliente de la [PokéAPI](https://pokeapi.co/docs/v2) en Python, **sin dependencias
 externas** (solo librería estándar), con caché local en disco, reintentos
 automáticos y CLI.
@@ -256,6 +258,26 @@ python -m pokeapi.web
 
 Respeta la variable `PORT` y es multihilo, así que aguanta peticiones
 concurrentes sin problema.
+
+## Integración continua
+
+[.github/workflows/ci.yml](.github/workflows/ci.yml) corre en cada push y cada
+pull request:
+
+1. **Tests** en Python 3.9, 3.11 y 3.12, y comprueba que el paquete instala y
+   que el CLI arranca.
+2. **Smoke test**: levanta el servidor con el comando exacto de Render
+   (`python -m gunicorn …`) y con el de reserva (`python -m pokeapi.web`), y
+   verifica que `/health` responde. Este paso existe porque un deploy real
+   murió con status 127 al no encontrar `gunicorn` en el PATH.
+3. **Deploy** a Render, solo si lo anterior pasa y solo desde `main`.
+
+Los pull requests ejecutan 1 y 2, pero nunca despliegan.
+
+Para que el paso de deploy funcione hace falta el secret
+`RENDER_DEPLOY_HOOK_URL` (Render → servicio → Settings → Deploy Hook), y
+conviene poner **Auto-Deploy en No** en Render para que solo se despliegue
+cuando el CI da el visto bueno.
 
 ## Tests
 
