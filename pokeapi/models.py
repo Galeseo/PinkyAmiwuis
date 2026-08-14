@@ -214,6 +214,70 @@ class Pokemon:
 
 
 # ---------------------------------------------------------------------------
+# Tipos y efectividades
+# ---------------------------------------------------------------------------
+
+
+@dataclass
+class TypeInfo:
+    """Un tipo y sus relaciones de daño.
+
+    Los nombres van desde el punto de vista del tipo: ``double_damage_from``
+    son los tipos que le hacen el doble, o sea sus debilidades.
+    """
+
+    id: int
+    name: str
+    double_damage_from: List[str] = field(default_factory=list)
+    half_damage_from: List[str] = field(default_factory=list)
+    no_damage_from: List[str] = field(default_factory=list)
+    double_damage_to: List[str] = field(default_factory=list)
+    half_damage_to: List[str] = field(default_factory=list)
+    no_damage_to: List[str] = field(default_factory=list)
+    raw: Dict[str, Any] = field(default_factory=dict, repr=False)
+
+    # Alias en castellano, que es como se piensan estas cosas al jugar.
+    @property
+    def weaknesses(self) -> List[str]:
+        """Tipos que le hacen el doble de daño."""
+        return self.double_damage_from
+
+    @property
+    def resistances(self) -> List[str]:
+        """Tipos que le hacen la mitad."""
+        return self.half_damage_from
+
+    @property
+    def immunities(self) -> List[str]:
+        """Tipos que no le hacen nada."""
+        return self.no_damage_from
+
+    @property
+    def strong_against(self) -> List[str]:
+        """Tipos a los que golpea el doble."""
+        return self.double_damage_to
+
+    @classmethod
+    def from_dict(cls, data: Dict[str, Any]) -> "TypeInfo":
+        relations = data.get("damage_relations") or {}
+
+        def names(key: str) -> List[str]:
+            return [_name(item) or "" for item in relations.get(key, [])]
+
+        return cls(
+            id=data.get("id", 0),
+            name=data.get("name", ""),
+            double_damage_from=names("double_damage_from"),
+            half_damage_from=names("half_damage_from"),
+            no_damage_from=names("no_damage_from"),
+            double_damage_to=names("double_damage_to"),
+            half_damage_to=names("half_damage_to"),
+            no_damage_to=names("no_damage_to"),
+            raw=data,
+        )
+
+
+# ---------------------------------------------------------------------------
 # Especie
 # ---------------------------------------------------------------------------
 

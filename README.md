@@ -5,7 +5,7 @@ WiuWiuWiu
 
 Cliente de la [PokéAPI](https://pokeapi.co/docs/v2) en Python, **sin dependencias
 externas** (solo librería estándar), con caché local en disco, reintentos
-automáticos y CLI.
+automáticos y CLI UN SALUDO A TODOS LOS ANORMALES A LOS QUE LES GUSTAN LAS ABUELAS CACHONDAS EN TANGA.
 
 ## Uso rápido
 
@@ -163,6 +163,35 @@ Tipo Fire — 109 Pokémon
 
 Un nombre exacto de Pokémon siempre gana, así que esto nunca tapa una ficha.
 
+### Debilidades
+
+```console
+$ python3 -m pokeapi weakness fire flying
+Debilidades de Fire + Flying
+============================
+
+  x4   Rock  ← débil
+  x2   Electric, Water  ← débil
+  x½   Fairy, Fighting, Fire, Steel
+  x¼   Bug, Grass
+  x0   Ground  ← inmune
+
+(11 tipos le hacen daño normal; --full para verlos)
+```
+
+Con varios tipos combina las relaciones de daño: roca pega x2 a fuego y x2 a
+volador, así que a Charizard le hace **x4**. Las inmunidades ganan siempre —
+tierra le haría x2 por fuego, pero volador es inmune, así que el total es x0.
+
+La ficha de cada Pokémon incluye ya sus debilidades:
+
+```console
+$ python3 -m pokeapi pokemon gengar
+#0094  Gengar
+Tipos:      Ghost, Poison
+Débil a:    Dark (x2), Ghost (x2), Ground (x2), Psychic (x2)
+```
+
 ### Caracteres especiales
 
 Lo que se escribe se compara contra el índice local, así que nunca acaba dentro
@@ -210,6 +239,7 @@ python3 -m pokeapi.web        # http://localhost:8000
 | `GET /species/{nombre\|id}` | Especie y Pokédex (`?lang=es`) |
 | `GET /evolution/{nombre\|id}` | Cadena evolutiva |
 | `GET /type/{tipo}` | Pokémon del tipo. Varios: `/type/fire,flying` (`?mode=any` para la unión) |
+| `GET /weakness/{tipo}` | Debilidades, resistencias e inmunidades. Combinadas: `/weakness/fire,flying` |
 | `GET /types` | Los 21 tipos |
 | `GET /search?q={texto}` | Búsqueda por subcadena |
 | `GET /health` | Estado y estadísticas de caché |

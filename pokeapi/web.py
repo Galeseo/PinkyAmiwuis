@@ -108,6 +108,7 @@ def route_index() -> Dict[str, Any]:
             "GET /species/{nombre|id}": "Especie y Pokédex. ?lang=es por defecto",
             "GET /evolution/{nombre|id}": "Cadena evolutiva",
             "GET /type/{tipo}": "Pokémon de un tipo. Varios: /type/fire,flying",
+            "GET /weakness/{tipo}": "Debilidades. Combinadas: /weakness/fire,flying",
             "GET /types": "Los tipos disponibles",
             "GET /search?q={texto}": "Busca por subcadena",
             "GET /health": "Estado del servicio",
@@ -145,7 +146,10 @@ def route_pokemon(query: str, params: Dict[str, str]) -> Tuple[int, Dict[str, An
     pokemon = client.get_pokemon(match.results[0].name)
     if params.get("raw"):
         return 200, pokemon.raw
-    return 200, _pokemon(pokemon)
+
+    payload = _pokemon(pokemon)
+    payload["weaknesses"] = client.weaknesses(pokemon.types)
+    return 200, payload
 
 
 def route_species(query: str, params: Dict[str, str]) -> Tuple[int, Dict[str, Any]]:
@@ -204,6 +208,40 @@ def route_type(query: str, params: Dict[str, str]) -> Tuple[int, Dict[str, Any]]
     }
 
 
+def route_weakness(query: str, params: Dict[str, str]) -> Tuple[int, Dict[str, Any]]:
+    requested = [part for part in query.replace("+", ",").split(",") if part.strip()]
+    if not requested:
+        return 400, {"error": "Indica al menos un tipo, p. ej. /weakness/fire"}
+
+    names: List[str] = []
+    for raw in requested:
+        match = client.find(raw, "type")
+        if not match:
+            return 404, {
+                "error": "No existe el tipo '{0}'.".format(raw),
+                "available": [item.name for item in client.name_index("type")],
+            }
+        if not match.is_exact and not match.is_unique:
+            return 400, {
+                "error": "'{0}' es ambiguo.".format(raw),
+                "matches": [item.name for item in match.results],
+            }
+        names.append(match.results[0].name)
+
+    return 200, _damage_payload(names)
+
+
+def _damage_payload(names: List[str]) -> Dict[str, Any]:
+    multipliers = client.damage_multipliers(names)
+    return {
+        "types": names,
+        "weaknesses": {k: v for k, v in multipliers.items() if v > 1},
+        "resistances": {k: v for k, v in multipliers.items() if 0 < v < 1},
+        "immunities": [k for k, v in multipliers.items() if v == 0],
+        "multipliers": multipliers,
+    }
+
+
 def route_types() -> Tuple[int, Dict[str, Any]]:
     types = client.name_index("type")
     return 200, {"count": len(types), "types": [item.name for item in types]}
@@ -245,16 +283,19 @@ def dispatch(path: str, params: Dict[str, str]) -> Tuple[int, Dict[str, Any]]:
     if head == "search":
         return route_search(params)
 
-    if head in ("pokemon", "species", "evolution", "type"):
+    if head in ("pokemon", "species", "evolution", "type", "weakness"):
         if not rest:
             if head == "type":
                 return route_types()
+            if head == "weakness":
+                return 400, {"error": "Falta el tipo, p. ej. /weakness/fire"}
             return 400, {"error": "Falta el nombre, p. ej. /{0}/pikachu".format(head)}
         handler = {
             "pokemon": route_pokemon,
             "species": route_species,
             "evolution": route_evolution,
             "type": route_type,
+            "weakness": route_weakness,
         }[head]
         return handler(rest, params)
 

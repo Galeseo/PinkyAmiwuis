@@ -45,9 +45,18 @@ def _bar(value: int, maximum: int = 255, width: int = 24) -> str:
     return "█" * filled + "·" * (width - filled)
 
 
-def print_pokemon(pokemon: Pokemon, show_moves: bool = False) -> None:
+def print_pokemon(
+    pokemon: Pokemon,
+    show_moves: bool = False,
+    weaknesses: Optional[Dict[str, float]] = None,
+) -> None:
     print("#{0:04d}  {1}".format(pokemon.id, _title(pokemon.name)))
     print("Tipos:      {0}".format(", ".join(_title(t) for t in pokemon.types)))
+    if weaknesses:
+        print("Débil a:    {0}".format(", ".join(
+            "{0} ({1})".format(_title(name), _factor(value))
+            for name, value in weaknesses.items()
+        )))
     print("Altura:     {0:.1f} m".format(pokemon.height_m))
     print("Peso:       {0:.1f} kg".format(pokemon.weight_kg))
     if pokemon.base_experience is not None:
@@ -284,7 +293,11 @@ def cmd_pokemon(client: PokeApiClient, args: argparse.Namespace) -> int:
         dump(pokemon.raw)
         return 0
 
-    print_pokemon(pokemon, show_moves=args.moves)
+    print_pokemon(
+        pokemon,
+        show_moves=args.moves,
+        weaknesses=client.weaknesses_of(pokemon),
+    )
     if note:
         print("\n{0}".format(note))
     return 0
@@ -334,6 +347,60 @@ def resolve_type(client: PokeApiClient, query: str) -> Optional[str]:
 
     print_candidates(match, "type", noun="tipos", show_ids=False)
     return None
+
+
+def _factor(value: float) -> str:
+    """'x4', 'x½', 'x0'… para que la tabla se lea de un vistazo."""
+    symbols = {0.25: "x¼", 0.5: "x½", 0.125: "x⅛"}
+    return symbols.get(value, "x{0:g}".format(value))
+
+
+def print_weaknesses(
+    client: PokeApiClient, names: List[str], as_json: bool = False, full: bool = False
+) -> int:
+    """Tabla de efectividades contra una combinación de tipos."""
+    multipliers = client.damage_multipliers(names)
+
+    if as_json:
+        dump({
+            "types": names,
+            "weaknesses": {k: v for k, v in multipliers.items() if v > 1},
+            "resistances": {k: v for k, v in multipliers.items() if 0 < v < 1},
+            "immunities": [k for k, v in multipliers.items() if v == 0],
+            "multipliers": multipliers,
+        })
+        return 0
+
+    label = "Debilidades de {0}".format(" + ".join(_title(n) for n in names))
+    print(label)
+    print("=" * len(label))
+
+    # Agrupamos por multiplicador: interesa "qué me hace x4", no el orden
+    # alfabético de los 21 tipos.
+    grouped: Dict[float, List[str]] = {}
+    for name, value in multipliers.items():
+        if value == 1 and not full:
+            continue
+        grouped.setdefault(value, []).append(name)
+
+    if not grouped:
+        print("\n  Sin debilidades ni resistencias: todo le hace daño normal.")
+        return 0
+
+    print()
+    for value in sorted(grouped, reverse=True):
+        types = ", ".join(_title(name) for name in sorted(grouped[value]))
+        tag = ""
+        if value > 1:
+            tag = "  ← débil"
+        elif value == 0:
+            tag = "  ← inmune"
+        print("  {0:<4} {1}{2}".format(_factor(value), types, tag))
+
+    if not full:
+        neutral = sum(1 for value in multipliers.values() if value == 1)
+        print("\n({0} tipos le hacen daño normal; --full para verlos)".format(neutral))
+    return 0
 
 
 def print_type_listing(
@@ -386,6 +453,24 @@ def cmd_type(client: PokeApiClient, args: argparse.Namespace) -> int:
         names.append(name)
 
     return print_type_listing(client, names, not args.any, args.json)
+
+
+def cmd_weakness(client: PokeApiClient, args: argparse.Namespace) -> int:
+    if not args.types:
+        types = client.name_index("type")
+        print("Indica un tipo. Disponibles ({0}):\n".format(len(types)))
+        print_resources(types, show_ids=False)
+        print("\nEjemplo:  {0} weakness fire flying".format(_prog()))
+        return 0
+
+    names = []
+    for raw in args.types:
+        name = resolve_type(client, raw)
+        if name is None:
+            return 2
+        names.append(name)
+
+    return print_weaknesses(client, names, args.json, args.full)
 
 
 def cmd_list(client: PokeApiClient, args: argparse.Namespace) -> int:
@@ -496,6 +581,13 @@ def build_parser() -> argparse.ArgumentParser:
         help="Los que tengan ALGUNO de los tipos, en vez de todos.",
     )
     p_type.set_defaults(func=cmd_type)
+
+    p_weak = sub.add_parser("weakness", help="Debilidades de un tipo o combinación.")
+    p_weak.add_argument("types", nargs="*", help="Tipos (fire, fire flying…).")
+    p_weak.add_argument(
+        "--full", action="store_true", help="Incluye también los tipos neutros (x1)."
+    )
+    p_weak.set_defaults(func=cmd_weakness)
 
     p_list = sub.add_parser("list", help="Listado paginado de recursos.")
     p_list.add_argument("--endpoint", default="pokemon", help="pokemon, type, move…")

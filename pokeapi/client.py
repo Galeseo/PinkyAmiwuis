@@ -23,7 +23,15 @@ from .errors import (
     NotFoundError,
     RateLimitError,
 )
-from .models import EvolutionChain, Match, NamedResource, Page, Pokemon, Species
+from .models import (
+    EvolutionChain,
+    Match,
+    NamedResource,
+    Page,
+    Pokemon,
+    Species,
+    TypeInfo,
+)
 
 BASE_URL = "https://pokeapi.co/api/v2"
 USER_AGENT = "pokeapi-py/1.0 (+https://github.com/)"
@@ -242,6 +250,60 @@ class PokeApiClient:
         needed = len(set(normalize(key) for key in keys)) if match_all else 1
         matches = [found[name] for name, hits in counts.items() if hits >= needed]
         return sorted(matches, key=lambda item: item.id or 0)
+
+    # -- Debilidades y efectividades --------------------------------------
+
+    def get_type(self, key: Key) -> TypeInfo:
+        """Un tipo con sus relaciones de daño."""
+        try:
+            return TypeInfo.from_dict(self.get_json("type", normalize(key)))
+        except NotFoundError:
+            raise NotFoundError("el tipo", str(key))
+
+    def damage_multipliers(self, types: List[Key]) -> Dict[str, float]:
+        """Multiplicador de daño que recibe una combinación de tipos.
+
+        Combina las relaciones de cada tipo defensor: si Charizard es
+        fire+flying, roca le hace x2 por fire y x2 por flying, o sea x4.
+
+        Devuelve el multiplicador de *todos* los tipos atacantes, incluidos
+        los neutros (x1), ordenado de más peligroso a menos.
+        """
+        defenders = [normalize(key) for key in types]
+        if not defenders:
+            return {}
+
+        multipliers = {item.name: 1.0 for item in self.name_index("type")}
+
+        for defender in defenders:
+            info = self.get_type(defender)
+            for attacker in info.double_damage_from:
+                if attacker in multipliers:
+                    multipliers[attacker] *= 2
+            for attacker in info.half_damage_from:
+                if attacker in multipliers:
+                    multipliers[attacker] *= 0.5
+            for attacker in info.no_damage_from:
+                if attacker in multipliers:
+                    multipliers[attacker] = 0.0
+
+        return dict(
+            sorted(multipliers.items(), key=lambda pair: (-pair[1], pair[0]))
+        )
+
+    def weaknesses(self, types: List[Key]) -> Dict[str, float]:
+        """Solo lo que hace más daño de lo normal (x2, x4…)."""
+        return {
+            name: factor
+            for name, factor in self.damage_multipliers(types).items()
+            if factor > 1
+        }
+
+    def weaknesses_of(self, pokemon: Union[Pokemon, Key]) -> Dict[str, float]:
+        """Debilidades de un Pokémon concreto, combinando sus tipos."""
+        if not isinstance(pokemon, Pokemon):
+            pokemon = self.get_pokemon(pokemon)
+        return self.weaknesses(pokemon.types)
 
     # -- Genéricos --------------------------------------------------------
 

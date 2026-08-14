@@ -496,6 +496,118 @@ class TestTypes(unittest.TestCase):
         self.assertTrue(self.client.find("fire", "type").is_exact)
 
 
+def _damage(name, **relations):
+    """Simula /type/{x} con sus relaciones de daño."""
+    payload = {"id": 1, "name": name, "damage_relations": {}, "pokemon": []}
+    for key in (
+        "double_damage_from",
+        "half_damage_from",
+        "no_damage_from",
+        "double_damage_to",
+        "half_damage_to",
+        "no_damage_to",
+    ):
+        payload["damage_relations"][key] = [
+            {"name": item, "url": ""} for item in relations.get(key, [])
+        ]
+    return payload
+
+
+class TestWeaknesses(unittest.TestCase):
+    """Relaciones de daño reales del juego, con datos fijos."""
+
+    def setUp(self):
+        self.client = FakeClient(
+            {
+                "type/fire": _damage(
+                    "fire",
+                    double_damage_from=["ground", "rock", "water"],
+                    half_damage_from=["bug", "steel", "fire", "grass", "ice", "fairy"],
+                ),
+                "type/flying": _damage(
+                    "flying",
+                    double_damage_from=["rock", "electric", "ice"],
+                    half_damage_from=["fighting", "bug", "grass"],
+                    no_damage_from=["ground"],
+                ),
+                "type/ghost": _damage(
+                    "ghost",
+                    double_damage_from=["ghost", "dark"],
+                    half_damage_from=["poison", "bug"],
+                    no_damage_from=["normal", "fighting"],
+                ),
+                "type?": _index(
+                    "normal", "fighting", "flying", "ground", "rock", "bug",
+                    "ghost", "steel", "fire", "grass", "electric", "ice",
+                    "poison", "water", "dark", "fairy",
+                ),
+            }
+        )
+
+    def test_tipo_con_sus_relaciones(self):
+        info = self.client.get_type("fire")
+        self.assertEqual(info.weaknesses, ["ground", "rock", "water"])
+        self.assertIn("steel", info.resistances)
+        self.assertEqual(info.immunities, [])
+
+    def test_debilidad_simple(self):
+        weak = self.client.weaknesses(["fire"])
+        self.assertEqual(sorted(weak), ["ground", "rock", "water"])
+        self.assertTrue(all(value == 2 for value in weak.values()))
+
+    def test_doble_tipo_multiplica(self):
+        # Roca pega x2 a fire y x2 a flying: Charizard la recibe x4.
+        weak = self.client.weaknesses(["fire", "flying"])
+        self.assertEqual(weak["rock"], 4)
+        self.assertEqual(weak["electric"], 2)
+        self.assertEqual(weak["water"], 2)
+
+    def test_la_inmunidad_gana_a_la_debilidad(self):
+        # Tierra le hace x2 a fire, pero flying es inmune: el total es 0.
+        multipliers = self.client.damage_multipliers(["fire", "flying"])
+        self.assertEqual(multipliers["ground"], 0)
+        self.assertNotIn("ground", self.client.weaknesses(["fire", "flying"]))
+
+    def test_resistencias_se_acumulan(self):
+        # Bicho: x½ por fire y x½ por flying = x¼.
+        multipliers = self.client.damage_multipliers(["fire", "flying"])
+        self.assertEqual(multipliers["bug"], 0.25)
+        self.assertEqual(multipliers["grass"], 0.25)
+
+    def test_hielo_solo_es_debilidad_por_flying(self):
+        multipliers = self.client.damage_multipliers(["fire", "flying"])
+        self.assertEqual(multipliers["ice"], 1.0)  # x2 por flying, x½ por fire
+
+    def test_inmunidades_de_ghost(self):
+        multipliers = self.client.damage_multipliers(["ghost"])
+        self.assertEqual(multipliers["normal"], 0)
+        self.assertEqual(multipliers["fighting"], 0)
+
+    def test_devuelve_todos_los_tipos(self):
+        multipliers = self.client.damage_multipliers(["fire"])
+        self.assertEqual(len(multipliers), 16)
+
+    def test_ordenado_de_mas_peligroso_a_menos(self):
+        values = list(self.client.damage_multipliers(["fire", "flying"]).values())
+        self.assertEqual(values, sorted(values, reverse=True))
+
+    def test_sin_tipos(self):
+        self.assertEqual(self.client.damage_multipliers([]), {})
+
+    def test_debilidades_de_un_pokemon(self):
+        client = FakeClient(
+            {
+                "type/electric": _damage("electric", double_damage_from=["ground"]),
+                "type?": _index("ground", "electric"),
+                "pokemon?": INDEX_JSON,
+                "/pokemon/": POKEMON_JSON,
+            }
+        )
+        # POKEMON_JSON es electric+flying, pero solo definimos electric aquí.
+        client.responses["type/flying"] = _damage("flying", no_damage_from=["ground"])
+        self.assertEqual(client.weaknesses_of("pikachu"), {})
+
+
 class TestWeb(unittest.TestCase):
     """La capa HTTP, sin levantar ningún servidor ni tocar la red."""
 
@@ -509,7 +621,15 @@ class TestWeb(unittest.TestCase):
                 "/pokemon-species/": SPECIES_JSON,
                 "/evolution-chain/": CHAIN_JSON,
                 "type/fire": _type(("charmander", 4), ("charizard", 6)),
-                "type?": _index("fire", "flying"),
+                # POKEMON_JSON es electric+flying: la ficha calcula sus
+                # debilidades, así que hacen falta sus relaciones de daño.
+                "type/electric": _damage("electric", double_damage_from=["ground"]),
+                "type/flying": _damage(
+                    "flying",
+                    double_damage_from=["rock", "electric", "ice"],
+                    no_damage_from=["ground"],
+                ),
+                "type?": _index("fire", "flying", "electric", "ground", "rock", "ice"),
                 "pokemon?": INDEX_JSON,
                 "/pokemon/": POKEMON_JSON,
             }
